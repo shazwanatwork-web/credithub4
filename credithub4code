@@ -1,0 +1,1098 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  Menu, Shield, Zap, TrendingUp, DollarSign, Gift, Clock, Settings, Info,
+  Plus, X, Trash2, Edit, Save, Sun, Moon, CornerUpLeft, BookOpen, Layers,
+  CreditCard as CardIcon, Calendar, BarChart, HardHat, Globe, Check, ChevronDown, ChevronUp, GripVertical,
+  Eye, EyeOff, LayoutTemplate, Palette, FileText, Lightbulb, RefreshCw, Wallet, PieChart, Percent, MapPin, Tag, RotateCcw,
+  Layout, List, ImageIcon, Upload, RotateCw, Move, ZoomIn, ZoomOut, Download, CloudUpload, CloudDownload, FileJson, FileUp, Type, Undo2, Key, Star, ArrowUp, ArrowDown, MoveVertical, AlertCircle, StickyNote, Activity, Briefcase, ShoppingBag, Flag, Hourglass, Camera, Award, Monitor, Sparkles, Wallet2, Receipt, Settings2, SlidersHorizontal, LayoutGrid, Wand2, Pipette, Edit3, Coffee, CalendarRange, Trophy, Target, CheckCircle2, Activity as GaugeIcon, Languages, Database, DownloadCloud, UploadCloud, AlertTriangle, Sparkle, Share2, Cloud, LayoutPanelTop, PanelLeft, ArrowUpCircle, ArrowDownCircle, Boxes, ListOrdered, Landmark, ChevronLeft, Pin, PinOff, SortAsc, SortDesc, Filter, Table, Github
+} from 'lucide-react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, query } from 'firebase/firestore';
+
+// --- INISIALISASI FIREBASE ---
+// Note: In this environment, we ensure firebaseConfig is accessed safely
+const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+const firebaseApp = initializeApp(firebaseConfig);
+const auth = getAuth(firebaseApp);
+const db = getFirestore(firebaseApp);
+
+// --- PEMALAR SISTEM GLOBAL ---
+const MALAYSIAN_BANKS_DEFAULT = [
+  "Maybank", "CIMB", "Public Bank", "RHB", "Hong Leong", "AmBank", "UOB", "Others"
+];
+
+const DEFAULT_TABS = [
+  { id: 'dashboard', key: 'tab_dashboard', icon: Zap },
+  { id: 'inventory', key: 'tab_inventory', icon: CardIcon },
+  { id: 'card-perks', key: 'tab_perks', icon: Gift },
+  { id: 'debt-analysis', key: 'tab_debt_analysis', icon: BarChart },
+  { id: 'history', key: 'tab_history', icon: Layers },
+  { id: 'settings', key: 'tab_settings', icon: Settings }
+];
+
+const PERK_TAGS = ['Travel', 'Cashback', 'Points', 'Hotel', 'Petrol'];
+
+const ACCENT_COLORS = [
+  { id: 'cyan', name: 'Cyan Neon', hex: '#22d3ee' },
+  { id: 'fuchsia', name: 'Fuchsia Glow', hex: '#d946ef' },
+  { id: 'emerald', name: 'Emerald Night', hex: '#34d399' },
+  { id: 'amber', name: 'Amber Gold', hex: '#fbbf24' },
+  { id: 'rose', name: 'Rose Petal', hex: '#fb7185' }
+];
+
+const FONT_COLORS = [
+  { id: 'black', hex: '#000000' },
+  { id: 'white', hex: '#ffffff' },
+  { id: 'dark-red', hex: '#991b1b' },
+  { id: 'gray-800', hex: '#1f2937' },
+  { id: 'sun-yellow', hex: '#fdfd00' }
+];
+
+const GLOW_COLORS = [
+  { id: 'glow-cyan', name: 'Cyan', hex: '#22d3ee' },
+  { id: 'glow-pink', name: 'Pink', hex: '#ff007f' },
+  { id: 'glow-orange', name: 'Orange', hex: '#ff4500' },
+  { id: 'glow-red', name: 'Red', hex: '#991b1b' }
+];
+
+const NIGHT_BGS = [
+  { id: 'bg-slate-950', class: 'bg-slate-950', defaultFont: '#ffffff' },
+  { id: 'bg-black', class: 'bg-black', defaultFont: '#ffffff' }
+];
+
+const DAY_BGS = [
+  { id: 'bg-white', class: 'bg-white', defaultFont: '#000000' },
+  { id: 'bg-slate-50', class: 'bg-slate-50', defaultFont: '#000000' }
+];
+
+const FIELD_GROUPS = [
+  { id: 'overview', name: 'Overview', keys: ['limit', 'currentOutstanding', 'availableCredit', 'usage'] },
+  { id: 'statement', name: 'Statement', keys: ['statementBalance', 'statementDate', 'paymentDueDate', 'minPayment'] },
+  { id: 'payment', name: 'Payment & Debt', keys: ['lastPaymentAmount', 'lastPaymentDate', 'debtBalance', 'finalPayment'] },
+  { id: 'details', name: 'Details', keys: ['benefitType', 'benefitValue', 'network', 'perks'] }
+];
+
+const DEFAULT_SETTINGS_ORDER = [
+  { id: 'header', key: 'headerConfigTitle' },
+  { id: 'navLabels', key: 'navLabelConfigTitle' },
+  { id: 'navOrder', key: 'navOrderConfigTitle' },
+  { id: 'settingsLayout', key: 'settingsLayoutConfigTitle' },
+  { id: 'language', key: 'languageSettingTitle' },
+  { id: 'visual', key: 'visualEffectsTitle' },
+  { id: 'github', key: 'githubConfigTitle' },
+  { id: 'backup', key: 'dataManagementTitle' },
+  { id: 'fontColor', key: 'colorSettingTitle' },
+  { id: 'widgetFontColor', key: 'widgetFontColorTitle' },
+  { id: 'background', key: 'bgSettingTitle' },
+  { id: 'fieldMgmt', key: 'fieldConfigTitle' },
+  { id: 'dateMode', key: 'dateSelectorTitle' }
+];
+
+const i18n = {
+  ENG: {
+    tab_dashboard: 'Dashboard', tab_inventory: 'Card Inventory', tab_perks: 'Card Perks', tab_debt_analysis: 'Debt Analysis', tab_history: 'History & Logs', tab_settings: 'System Config',
+    mainTitle: 'CREDIT CONTROL HUB', addNewCard: 'Add New Card', saveChanges: 'Save Changes', headerConfigTitle: 'Header Configuration', headerConfigDesc: 'Main app title settings.',
+    navLabelConfigTitle: 'Navigation Labels', navLabelConfigDesc: 'Customize menu names.', navOrderConfigTitle: 'Navigation Menu Order', navOrderConfigDesc: 'Reorder sidebar items.',
+    settingsLayoutConfigTitle: 'Settings Page Layout', settingsLayoutConfigDesc: 'Reorder config boxes.', colorSettingTitle: 'Sidebar/Header Font Color', colorSettingDesc: 'Set text color for main UI.',
+    widgetFontColorTitle: 'Widget Content Font Color', widgetFontColorDesc: 'Set font for text inside boxes.', bgSettingTitle: 'Background Theme Selection', bgSettingDesc: 'Choose backgrounds.',
+    visualEffectsTitle: 'Visual Effects & Glow', visualEffectsDesc: 'Glow and lighting.', languageSettingTitle: 'Default Language Setting', languageSettingDesc: 'Set system language.',
+    dataManagementTitle: 'System Backup & Archive', dataManagementDesc: 'Export or wipe records.', fieldConfigTitle: 'Inventory Field Management', fieldConfigDesc: 'Toggle fields.',
+    dateSelectorTitle: 'Date Selection Mode', dateSelectorDesc: 'Manual or dropdown entry.',
+    githubConfigTitle: 'GitHub Integration', githubConfigDesc: 'Sync data to personal repository.',
+    inventorySaved: 'Settings Updated!', totalLimit: 'TOTAL CREDIT LIMIT', totalUsage: 'TOTAL USAGE', debtLabel: 'DEBT BALANCE', recentActivity: 'RECENT ACTIVITY',
+    assetModule: 'ASSET MODULE', motivationTitle: 'DEBT FREEDOM SCORE', motivationDesc: 'Safe credit limit percentage.', comparisonTitle: 'UTILIZATION ANALYSIS',
+    securityLevel: 'SECURITY: HIGH', encryptedMsg: 'AES 256-bit Active', visible: 'Visible', hidden: 'Hidden', resetBtn: 'Wipe Data', resetWarning: 'DANGER: Permanent deletion!',
+    exportBtn: 'Export JSON', importBtn: 'Import JSON', driveBtn: 'Backup Drive', addDebtBtn: 'Add Debt', lastUpdated: 'Last Updated', bankSelector: 'Bank Gallery',
+    backToBanks: 'Back to Banks', totalCards: 'Cards', addBankBtn: 'Add Bank', bankNameLabel: 'Bank Name', confirmAddBank: 'Add New Bank Folder', pinLabel: 'Pin Bank', historyTitle: 'Audit Logs',
+    deleteBankConfirm: 'Are you sure? Cards under this bank will also be removed.', cancel: 'Cancel', confirm: 'Delete', sortAZ: 'Sort A-Z', sortZA: 'Sort Z-A',
+    perkFilterTitle: 'Filter by Perks', compareTitle: 'Comparison View', modeDropdown: 'Dropdown', modeManual: 'Manual',
+    tableMode: 'Rewards Summary Table', galleryMode: 'Gallery Mode', expiryLabel: 'Expiry Date', pointsLabel: 'Points', milesLabel: 'Miles', cashbackShort: 'C/Back',
+    quickUpdateTitle: 'Quick Rewards Update', selectBank: 'Select Bank', selectCard: 'Select Card', updateBtn: 'Update Balance'
+  },
+  BM: {
+    tab_dashboard: 'Papan Pemuka', tab_inventory: 'Inventori Kad', tab_perks: 'Kelebihan Kad', tab_debt_analysis: 'Analisis Beban', tab_history: 'Sejarah & Log', tab_settings: 'Konfigurasi Sistem',
+    mainTitle: 'HAB KAWALAN KREDIT', addNewCard: 'Tambah Unit Kredit Baru', saveChanges: 'Simpan Perubahan', headerConfigTitle: 'Konfigurasi Tajuk', headerConfigDesc: 'Sesuaikan nama aplikasi utama.',
+    navLabelConfigTitle: 'Label Navigasi', navLabelConfigDesc: 'Sesuaikan nama menu.', navOrderConfigTitle: 'Susunan Menu Navigasi', navOrderConfigDesc: 'Susun semula bar sisi.',
+    settingsLayoutConfigTitle: 'Susunan Halaman Tetapan', settingsLayoutConfigDesc: 'Susun semula kedudukan kotak konfigurasi.', colorSettingTitle: 'Warna Font Sisi/Header', colorSettingDesc: 'Warna teks Sidebar dan Header.',
+    widgetFontColorTitle: 'Warna Font Kandungan Widget', widgetFontColorDesc: 'Warna teks kandungan kotak.', bgSettingTitle: 'Pilihan Tema Latar Belakang', bgSettingDesc: 'Pilih latar belakang tema.',
+    visualEffectsTitle: 'Kesan Visual & Cahaya', visualEffectsDesc: 'Sesuaikan cahaya glow.', languageSettingTitle: 'Tetapan Bahasa Lalai', languageSettingDesc: 'Pilih bahasa antaramuka.',
+    dataManagementTitle: 'Sandaran & Arkib', dataManagementDesc: 'Urus rekod data anda.', fieldConfigTitle: 'Pengurusan Medan Inventori', fieldConfigDesc: 'Kawal paparan medan data.',
+    dateSelectorTitle: 'Mod Kemasukan Tarikh', dateSelectorDesc: 'Pilih kaedah pemilihan tarikh.',
+    githubConfigTitle: 'Integrasi GitHub', githubConfigDesc: 'Simpan data ke repositori peribadi.',
+    inventorySaved: 'Tetapan Disimpan!', totalLimit: 'TOTAL HAD KREDIT', totalUsage: 'TOTAL PENGGUNAAN', debtLabel: 'BAKI HUTANG', recentActivity: 'AKTIVITI TERKINI',
+    assetModule: 'MODUL ASET', motivationTitle: 'SKOR KEMERDEKAAN', motivationDesc: 'Baki had bebas hutang.', comparisonTitle: 'ANALISIS PENGGUNAAN', securityLevel: 'KESELAMATAN: TINGGI',
+    encryptedMsg: 'Enkripsi AES Aktif', visible: 'Nampak', hidden: 'Sembunyi', resetBtn: 'Padam Data', resetWarning: 'AMARAN: Pemadaman kekal!', exportBtn: 'Eksport JSON',
+    importBtn: 'Import JSON', driveBtn: 'Sandar Drive', addDebtBtn: 'Tambah Hutang', lastUpdated: 'Kemaskini Terakhir', bankSelector: 'Galeri Bank', backToBanks: 'Kembali ke Bank',
+    totalCards: 'Jumlah Kad', addBankBtn: 'Tambah Bank', bankNameLabel: 'Nama Bank', confirmAddBank: 'Tambah Folder Bank', pinLabel: 'Pin Bank', historyTitle: 'Log Audit Sistem',
+    deleteBankConfirm: 'Adakah anda pasti? Semua kad di bawah bank ini juga akan dibuang.', cancel: 'Batal', confirm: 'Padam', sortAZ: 'Susun A-Z', sortZA: 'Susun Z-A',
+    perkFilterTitle: 'Tapis mengikut Kelebihan', compareTitle: 'Paparan Perbandingan', modeDropdown: 'Dropdown', modeManual: 'Manual',
+    tableMode: 'Jadual Rumusan Ganjaran', galleryMode: 'Mode Galeri', expiryLabel: 'Tarikh Luput', pointsLabel: 'Mata', milesLabel: 'Miles', cashbackShort: 'Tunai',
+    quickUpdateTitle: 'Kemaskini Ganjaran Pantas', selectBank: 'Pilih Bank', selectCard: 'Pilih Kad', updateBtn: 'Kemaskini Baki'
+  }
+};
+
+// --- FUNGSI PEMBANTU GLOBAL ---
+const formatCurrencyValue = (amount, symbol = 'RM') => {
+  const val = typeof amount === 'number' ? amount : (parseFloat(amount) || 0);
+  return `${symbol} ${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+const formatFullTimestamp = (dateIso, lang) => {
+  if (!dateIso) return '-';
+  const d = new Date(dateIso);
+  return d.toLocaleDateString(lang === 'BM' ? 'ms-MY' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+};
+
+// --- KOMPONEN UI GLOBAL ---
+
+const AppButtonFixed = ({ children, onClick, accentColor, variant = 'primary', className = '', disabled = false, isDarkMode }) => {
+  const accent = ACCENT_COLORS.find(c => c.id === accentColor) || ACCENT_COLORS[0];
+  const accentHex = accent.hex;
+  const baseClasses = "px-4 py-2 rounded-lg border transition-all duration-300 flex items-center justify-center space-x-2 font-black text-sm active:scale-95 shadow-md disabled:opacity-30";
+  const primaryStyle = { borderColor: accentHex, color: accentHex };
+  return (
+    <button 
+      onClick={onClick} 
+      disabled={disabled} 
+      style={variant === 'primary' ? primaryStyle : {}} 
+      className={`${baseClasses} ${className} ${variant !== 'primary' ? (isDarkMode ? 'border-white/10 text-white/40 hover:bg-white/5 hover:text-white' : 'border-slate-300 text-slate-500 hover:bg-slate-100 hover:text-slate-900') : 'hover:brightness-125'}`}
+    >
+      {children}
+    </button>
+  );
+};
+
+const ProgressBar = ({ label, current, max, accentColor, fontColor }) => {
+  const percentage = max > 0 ? (current / max) * 100 : 0;
+  const accent = ACCENT_COLORS.find(c => c.id === accentColor) || ACCENT_COLORS[0];
+  const accentHex = accent.hex;
+  return (
+    <div className="my-2" style={{ color: fontColor }}>
+      <div className="flex justify-between text-[10px] font-black uppercase mb-1">
+        <span className="opacity-90">{String(label)}</span>
+        <span className="opacity-90">{percentage.toFixed(1)}%</span>
+      </div>
+      <div className="h-2 rounded-full overflow-hidden bg-black/10 shadow-inner">
+        <div className="h-full transition-all duration-1000" style={{ width: `${Math.min(100, percentage)}%`, backgroundColor: percentage > 80 ? '#ef4444' : accentHex }}></div>
+      </div>
+    </div>
+  );
+};
+
+const StatCard = ({ title, value, icon: Icon, accentColor, isDarkMode, fontColor, glowEnabled, glowColor }) => {
+  const accent = ACCENT_COLORS.find(c => c.id === accentColor) || ACCENT_COLORS[0];
+  const accentHex = accent.hex;
+  return (
+    <div className={`p-5 rounded-2xl border transition-all duration-500 ${isDarkMode ? 'bg-white/5 border-white/10 backdrop-blur-md' : 'bg-white border-slate-200 shadow-xl'}`} style={glowEnabled ? { boxShadow: `0 0 25px ${glowColor || accentHex}33` } : {}}>
+      <div className="flex items-center space-x-3 mb-2" style={{ color: fontColor }}>
+        <Icon size={18} style={{ color: accentHex }} />
+        <span className="text-[10px] font-black uppercase tracking-widest opacity-70">{String(title)}</span>
+      </div>
+      <div className="text-2xl font-black font-mono" style={{ color: fontColor }}>{String(value)}</div>
+    </div>
+  );
+};
+
+const RadialGauge = ({ percentage, accentColor, fontColor, glowEnabled, glowColor }) => {
+  const accent = ACCENT_COLORS.find(c => c.id === accentColor) || ACCENT_COLORS[0];
+  const accentHex = accent.hex;
+  const radius = 80;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (percentage / 100) * circumference;
+  return (
+    <div className="relative flex items-center justify-center w-64 h-64 mx-auto">
+      <svg className="w-full h-full transform -rotate-90">
+        <circle cx="50%" cy="50%" r={radius} stroke="currentColor" strokeWidth="12" fill="transparent" className="opacity-10" style={{ color: fontColor }} />
+        <circle cx="50%" cy="50%" r={radius} stroke={accentHex} strokeWidth="12" fill="transparent" strokeDasharray={circumference} style={{ strokeDashoffset: offset, transition: 'stroke-dashoffset 1.5s ease-in-out', strokeLinecap: 'round' }} className={glowEnabled ? `drop-shadow-[0_0_12px_${glowColor || accentHex}88]` : ""} />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+        <span className="text-5xl font-black font-mono tracking-tighter" style={{ color: accentHex }}>{percentage.toFixed(1)}%</span>
+        <span className="text-[9px] font-black uppercase opacity-60 mt-1" style={{ color: fontColor }}>Freedom</span>
+      </div>
+    </div>
+  );
+};
+
+const UtilizationHeatBars = ({ data, symbol, fontColor, isDarkMode }) => {
+  const maxVal = Math.max(...data.flatMap(d => [d.limit, d.debt]), 1000);
+  return (
+    <div className="w-full space-y-6 p-2 text-left">
+      {data.map((item, idx) => {
+        const util = item.limit > 0 ? (item.debt / item.limit) * 100 : 0;
+        return (
+          <div key={idx} className="space-y-2 text-left">
+            <div className="flex justify-between items-center px-1 text-left">
+              <span className="text-[10px] font-black uppercase tracking-tight" style={{ color: fontColor }}>{item.name}</span>
+              <span className={`text-[10px] font-black font-mono ${util > 80 ? 'text-red-500' : 'text-emerald-500'}`}>{util.toFixed(1)}%</span>
+            </div>
+            <div className={`h-6 w-full rounded-full overflow-hidden border ${isDarkMode ? 'bg-black/20 border-white/5' : 'bg-slate-200 border-slate-300'}`}>
+                <div className={`h-full transition-all duration-1000 ease-out flex items-center justify-end px-2 ${util > 80 ? 'bg-gradient-to-r from-red-600 to-red-400' : 'bg-gradient-to-r from-cyan-600 to-cyan-400'}`} style={{ width: `${(item.debt / maxVal) * 100}%` }}>
+                     {util > 15 && <span className="text-[8px] font-black text-black opacity-80">{symbol}{item.debt.toLocaleString()}</span>}
+                </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const PieChartVisual = ({ data, symbol, fontColor, isDarkMode }) => {
+  const total = data.reduce((s, d) => s + d.value, 0);
+  if (total === 0) return <div className="h-64 flex flex-col items-center justify-center opacity-20 italic text-center text-white"><AlertCircle size={48}/><p className="text-sm font-black uppercase tracking-widest">No Debt Data Recorded</p></div>;
+  let cumulativePercent = 0;
+  return (
+    <div className="flex flex-col lg:flex-row items-center justify-center gap-12 w-full p-6">
+      <div className="relative">
+        <svg viewBox="-1.1 -1.1 2.2 2.2" className="w-56 h-56 md:w-72 md:h-72 -rotate-90 drop-shadow-2xl">
+          {data.map((slice, i) => {
+            const percent = slice.value / total;
+            const [startX, startY] = [Math.cos(2 * Math.PI * cumulativePercent), Math.sin(2 * Math.PI * cumulativePercent)];
+            cumulativePercent += percent;
+            const [endX, endY] = [Math.cos(2 * Math.PI * cumulativePercent), Math.sin(2 * Math.PI * cumulativePercent)];
+            const largeArcFlag = percent > 0.5 ? 1 : 0;
+            const pathData = [`M ${startX} ${startY}`, `A 1 1 0 ${largeArcFlag} 1 ${endX} ${endY}`, 'L 0 0'].join(' ');
+            return <path key={i} d={pathData} fill={slice.color} className="hover:opacity-80 transition-all cursor-pointer" />;
+          })}
+          <circle cx="0" cy="0" r={0.75} fill={isDarkMode ? "#0f172a" : "#ffffff"} />
+        </svg>
+      </div>
+    </div>
+  );
+};
+
+const BarChartVisual = ({ data, symbol, fontColor, isDarkMode }) => {
+  const max = Math.max(...data.map(d => d.value), 1);
+  if (data.length === 0) return <div className="h-64 flex flex-col items-center justify-center opacity-20 italic text-center text-white"><BarChart size={48} style={{ color: fontColor }}/><p className="text-sm font-black uppercase tracking-widest text-center" style={{ color: fontColor }}>No Debt Data Recorded</p></div>;
+  return (
+    <div className="w-full flex items-end justify-around h-64 border-b pt-10 px-6" style={{ borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}>
+      {data.map((d, i) => (
+        <div key={i} className="flex flex-col items-center w-full px-2 h-full justify-end group relative">
+          <div className="w-full max-w-[40px] rounded-t-lg transition-all duration-1000" style={{ height: `${(d.value / max) * 100}%`, backgroundColor: d.color, boxShadow: `0 0 15px ${d.color}33` }}></div>
+          <div className="text-[8px] mt-4 truncate w-full text-center font-black uppercase opacity-40 group-hover:opacity-100 transition-opacity" style={{ color: fontColor }}>{d.name}</div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// --- APLIKASI UTAMA ---
+const App = () => {
+  const [user, setUser] = useState(null);
+  const [cards, setCards] = useState([]);
+  const [userBanks, setUserBanks] = useState(MALAYSIAN_BANKS_DEFAULT);
+  const [pinnedBanks, setPinnedBanks] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [currentTab, setCurrentTab] = useState('dashboard');
+  const [language, setLanguage] = useState('ENG'); 
+  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [message, setMessage] = useState(null);
+  const [chartType, setChartType] = useState('pie'); 
+  
+  // States Kustomisasi UI
+  const [fontFamily, setFontFamily] = useState("'Inter', sans-serif");
+  const [fontColor, setFontColor] = useState('#ffffff');
+  const [widgetFontColor, setWidgetFontColor] = useState('#991b1b');
+  const [accentColor, setAccentColor] = useState('cyan');
+  const [currencySymbol, setCurrencySymbol] = useState('RM');
+  const [glowEnabled, setGlowEnabled] = useState(true);
+  const [glowColor, setGlowColor] = useState('#22d3ee');
+  const [dayBg, setDayBg] = useState('bg-white');
+  const [nightBg, setNightBg] = useState('bg-slate-950');
+
+  const [orderedTabs, setOrderedTabs] = useState(DEFAULT_TABS);
+  const [settingsOrder, setSettingsOrder] = useState(DEFAULT_SETTINGS_ORDER);
+  const [saveTimestamps, setSaveTimestamps] = useState({});
+  const [customLabels, setCustomLabels] = useState({});
+  const [showInventorySaveBtn, setShowInventorySaveBtn] = useState(false);
+
+  // States Galeri Bank & Modal
+  const [selectedBank, setSelectedBank] = useState(null);
+  const [isAddingBank, setIsAddingBank] = useState(false);
+  const [newBankName, setNewBankName] = useState('');
+  const [bankToDelete, setBankToDelete] = useState(null);
+  const [bankSortOrder, setBankSortOrder] = useState('AZ');
+  const [activeNavEditTab, setActiveNavEditTab] = useState(DEFAULT_TABS[0].id);
+  const [activeFieldGroupTab, setActiveFieldGroupTab] = useState(FIELD_GROUPS[0].id);
+  const [dateInputMode, setDateInputMode] = useState('dropdown');
+  const [activePerkTag, setActivePerkTag] = useState(null);
+  const [perksViewMode, setPerksViewMode] = useState('gallery');
+
+  // Quick Update States
+  const [isQuickUpdatingRewards, setIsQuickUpdatingRewards] = useState(false);
+  const [quickUpdateData, setQuickUpdateData] = useState({ bankName: '', cardId: '', type: 'points', value: '' });
+
+  // GitHub States
+  const [githubConfig, setGithubConfig] = useState({ token: '', username: '', repo: '', path: 'data.json' });
+
+  const [fieldConfig, setFieldConfig] = useState({
+    limit: { label: 'TOTAL CREDIT LIMIT', visible: true },
+    currentOutstanding: { label: 'CURRENT OUTSTANDING', visible: true },
+    availableCredit: { label: 'AVAILABLE CREDIT', visible: true },
+    bank: { label: 'BANK', visible: true },
+    usage: { label: 'USAGE', visible: true }
+  });
+
+  const t = i18n[language] || i18n.ENG;
+  const accent = ACCENT_COLORS.find(c => c.id === accentColor) || ACCENT_COLORS[0];
+  const accentHex = accent.hex;
+  
+  const getLabel = useCallback((key) => {
+    return String(customLabels[key] || t[key] || key);
+  }, [customLabels, t]);
+
+  const recordSaveTime = (sectionId) => {
+    const now = new Date();
+    const formattedTS = now.toLocaleDateString('ms-MY') + ', ' + now.toLocaleTimeString('ms-MY', { hour12: false });
+    setSaveTimestamps(prev => ({ ...prev, [sectionId]: formattedTS }));
+    const config = JSON.parse(localStorage.getItem('cc_hub_config') || '{}');
+    localStorage.setItem('cc_hub_config', JSON.stringify({ ...config, saveTimestamps: { ...(config.saveTimestamps || {}), [sectionId]: formattedTS } }));
+  };
+
+  const showMsg = (txt, type = 'success') => { setMessage({ text: String(txt), type }); setTimeout(() => setMessage(null), 5000); };
+
+  const handleSaveInventory = () => {
+    localStorage.setItem('cc_hub_data', JSON.stringify(cards));
+    localStorage.setItem('cc_hub_banks', JSON.stringify(userBanks));
+    localStorage.setItem('cc_hub_pinned', JSON.stringify(pinnedBanks));
+    setShowInventorySaveBtn(false); 
+    recordSaveTime('inventory_master');
+    showMsg(getLabel('inventorySaved'));
+  };
+
+  const handleAddBank = () => {
+    if (!newBankName.trim()) return;
+    if (userBanks.includes(newBankName)) return showMsg(language === 'BM' ? 'Bank sudah wujud!' : 'Bank already exists!', 'error');
+    setUserBanks(prev => [...prev, newBankName.trim()]);
+    setShowInventorySaveBtn(true); setIsAddingBank(false); setNewBankName('');
+  };
+
+  const handleDeleteBank = (bankName) => {
+    setUserBanks(prev => prev.filter(b => b !== bankName));
+    setPinnedBanks(prev => prev.filter(b => b !== bankName));
+    setCards(prev => prev.filter(c => c.bank !== bankName));
+    setBankToDelete(null);
+    setShowInventorySaveBtn(true);
+    showMsg(language === 'BM' ? 'Bank dipadam!' : 'Bank deleted!');
+  };
+
+  const togglePinBank = (bankName, e) => {
+    e.stopPropagation();
+    setPinnedBanks(prev => prev.includes(bankName) ? prev.filter(b => b !== bankName) : [...prev, bankName]);
+    setShowInventorySaveBtn(true);
+  };
+
+  const updateCard = (id, field, value) => { 
+    setCards(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c)); 
+    setShowInventorySaveBtn(true); 
+  };
+
+  const handleExportData = () => {
+    const dataStr = JSON.stringify({ cards, banks: userBanks, pinned: pinnedBanks, config: localStorage.getItem('cc_hub_config') });
+    const link = document.createElement('a'); link.setAttribute('href', 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr));
+    link.setAttribute('download', 'cc-hub-backup.json'); link.click();
+  };
+
+  const handleResetSystem = () => { if (window.confirm(getLabel('resetWarning'))) { localStorage.clear(); window.location.reload(); } };
+
+  // --- SAVE HANDLERS ---
+  const saveLabelsConfig = (id) => { recordSaveTime(id); localStorage.setItem('cc_hub_custom_labels', JSON.stringify(customLabels)); showMsg(getLabel('inventorySaved')); };
+  const saveVisualConfig = (id) => { recordSaveTime(id); const conf = JSON.parse(localStorage.getItem('cc_hub_config') || '{}'); localStorage.setItem('cc_hub_config', JSON.stringify({ ...conf, fontColor, widgetFontColor, glowEnabled, glowColor })); showMsg(getLabel('inventorySaved')); };
+  const saveBgConfig = () => { recordSaveTime('background'); const conf = JSON.parse(localStorage.getItem('cc_hub_config') || '{}'); localStorage.setItem('cc_hub_config', JSON.stringify({ ...conf, fontColor, widgetFontColor, dayBg, nightBg })); showMsg(getLabel('inventorySaved')); };
+  const saveNavOrderConfig = () => { recordSaveTime('navOrder'); localStorage.setItem('cc_hub_nav_order', JSON.stringify(orderedTabs.map(t => t.id))); showMsg(getLabel('inventorySaved')); };
+  const saveSettingsOrderConfig = () => { recordSaveTime('settingsLayout'); localStorage.setItem('cc_hub_settings_order', JSON.stringify(settingsOrder.map(s => s.id))); showMsg(getLabel('inventorySaved')); };
+  const saveFieldConfig = () => { recordSaveTime('fieldMgmt'); const conf = JSON.parse(localStorage.getItem('cc_hub_config') || '{}'); localStorage.setItem('cc_hub_config', JSON.stringify({ ...conf, fieldConfig })); showMsg(getLabel('inventorySaved')); };
+  const saveDateModeConfig = () => { recordSaveTime('dateMode'); const conf = JSON.parse(localStorage.getItem('cc_hub_config') || '{}'); localStorage.setItem('cc_hub_config', JSON.stringify({ ...conf, dateInputMode })); showMsg(getLabel('inventorySaved')); };
+  const saveLanguageConfig = () => { recordSaveTime('language'); const conf = JSON.parse(localStorage.getItem('cc_hub_config') || '{}'); localStorage.setItem('cc_hub_config', JSON.stringify({ ...conf, language })); showMsg(getLabel('inventorySaved')); };
+  const saveGithubConfig = () => { recordSaveTime('github'); localStorage.setItem('cc_hub_github_config', JSON.stringify(githubConfig)); showMsg(getLabel('inventorySaved')); };
+
+  const moveTab = (index, direction) => {
+    const newTabs = [...orderedTabs]; const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= newTabs.length) return;
+    [newTabs[index], newTabs[targetIndex]] = [newTabs[targetIndex], newTabs[index]];
+    setOrderedTabs(newTabs);
+  };
+
+  const moveSettingBlock = (index, direction) => {
+    const newOrder = [...settingsOrder]; const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= newOrder.length) return;
+    [newOrder[index], newOrder[targetIndex]] = [newOrder[targetIndex], newOrder[index]];
+    setSettingsOrder(newOrder);
+  };
+
+  useEffect(() => {
+    const initAuth = async () => { await signInAnonymously(auth); };
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+        if (u) {
+            setUser(u);
+            const data = localStorage.getItem('cc_hub_data'); if (data) setCards(JSON.parse(data));
+            const bankData = localStorage.getItem('cc_hub_banks'); if (bankData) setUserBanks(JSON.parse(bankData));
+            const pinData = localStorage.getItem('cc_hub_pinned'); if (pinData) setPinnedBanks(JSON.parse(pinData));
+            const lbls = localStorage.getItem('cc_hub_custom_labels'); if (lbls) setCustomLabels(JSON.parse(lbls));
+            const git = localStorage.getItem('cc_hub_github_config'); if (git) setGithubConfig(JSON.parse(git));
+            const nOrd = localStorage.getItem('cc_hub_nav_order');
+            if (nOrd) { const p = JSON.parse(nOrd); setOrderedTabs([...p.map(id => DEFAULT_TABS.find(t => t.id === id)).filter(Boolean), ...DEFAULT_TABS.filter(t => !p.includes(t.id))]); }
+            const sOrd = localStorage.getItem('cc_hub_settings_order');
+            if (sOrd) { const p = JSON.parse(sOrd); setSettingsOrder([...p.map(id => DEFAULT_SETTINGS_ORDER.find(s => s.id === id)).filter(Boolean), ...DEFAULT_SETTINGS_ORDER.filter(s => !p.includes(s.id))]); }
+            const confStr = localStorage.getItem('cc_hub_config');
+            if (confStr) {
+                const c = JSON.parse(confStr);
+                if (c.language) setLanguage(c.language); if (c.fontColor) setFontColor(c.fontColor);
+                if (c.widgetFontColor) setWidgetFontColor(c.widgetFontColor);
+                if (c.saveTimestamps) setSaveTimestamps(c.saveTimestamps);
+                if (c.dayBg) setDayBg(c.dayBg); if (c.nightBg) setNightBg(c.nightBg);
+                if (c.glowEnabled !== undefined) setGlowEnabled(c.glowEnabled);
+                if (c.glowColor) setGlowColor(c.glowColor);
+                if (c.dateInputMode) setDateInputMode(c.dateInputMode);
+                if (c.fieldConfig) setFieldConfig(c.fieldConfig);
+            }
+        }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const renderDashboard = () => (
+    <div className="space-y-8 pb-20 animate-in fade-in duration-500 text-left">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
+        <StatCard title={getLabel('totalLimit')} value={formatCurrencyValue(cards.reduce((s,c)=>s+(Number(c.limit)||0),0), currencySymbol)} icon={TrendingUp} accentColor={accentColor} isDarkMode={isDarkMode} fontColor={widgetFontColor} />
+        <StatCard title={getLabel('totalUsage')} value={formatCurrencyValue(cards.reduce((s,c)=>s+(Number(c.currentOutstanding)||0),0), currencySymbol)} icon={Wallet} accentColor={accentColor} isDarkMode={isDarkMode} fontColor={widgetFontColor} />
+        <StatCard title={getLabel('debtLabel')} value={formatCurrencyValue(cards.reduce((s,c)=>s+(Number(c.debtBalance)||0),0), currencySymbol)} icon={AlertCircle} accentColor="red-400" isDarkMode={isDarkMode} fontColor={widgetFontColor} />
+      </div>
+      <div className={`p-6 rounded-2xl border transition-all ${isDarkMode ? 'bg-white/5 border-white/10 shadow-glow' : 'bg-white border-slate-200 shadow-sm'}`}>
+        <h3 className="text-lg font-black mb-4 flex items-center space-x-2 text-left" style={{ color: widgetFontColor }}><Clock style={{ color: accentHex }} /><span>{getLabel('recentActivity')}</span></h3>
+        <div className="text-[10px] font-black uppercase text-left opacity-80" style={{ color: widgetFontColor }}>Status Sistem: Normal & Aktif</div>
+      </div>
+    </div>
+  );
+
+  const renderCardList = (filteredCards) => (
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-10">
+        {filteredCards.map(c => (
+          <div key={c.id} className="relative group perspective-1000 h-[44rem] text-left">
+              <div className={`w-full h-full rounded-[2.5rem] overflow-hidden border transition-all duration-700 ${isDarkMode ? 'border-white/10' : 'border-slate-300'} shadow-2xl text-left`}>
+                {c.imageUrl ? <img src={c.imageUrl} alt={c.name} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gradient-to-br p-8 from-slate-800 to-black text-left"><div className="flex justify-between"><CardIcon className="text-white/20" size={40} /><div className="flex gap-1">{c.tags?.map(t => <span key={t} className="px-2 py-1 rounded bg-white/10 text-[8px] font-black text-white/50">{t}</span>)}</div></div><div className="mt-20 text-white/60 font-mono text-lg text-left">•••• {c.id.slice(-4)}</div><div className="mt-auto text-white/40 font-bold uppercase text-left">{c.name}</div></div>}
+              </div>
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-all duration-500 bg-black/95 backdrop-blur-xl rounded-[2.5rem] p-8 flex flex-col border border-cyan-400/30 z-20 overflow-y-auto text-left" style={{ color: widgetFontColor }}>
+                  <div className="flex justify-between items-start mb-4 text-left"><input className="bg-transparent text-xl font-black border-none focus:ring-0 w-full outline-none text-left" style={{ color: widgetFontColor }} value={c.name} onChange={(e) => updateCard(c.id, 'name', e.target.value)} /><button onClick={() => { setCards(prev => prev.filter(x=>x.id!==c.id)); setShowInventorySaveBtn(true); }} className="text-red-500 text-left"><Trash2 size={20} /></button></div>
+                  
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    {['limit','currentOutstanding'].map(k => <div key={k} className="space-y-1 text-left"><label className="text-[7px] font-black uppercase opacity-60 text-left">{k}</label><input type="number" className="bg-transparent text-xs font-bold w-full outline-none text-left" style={{ color: widgetFontColor }} value={c[k] || 0} onChange={(e) => updateCard(c.id, k, e.target.value)} /></div>)}
+                  </div>
+                  
+                  <div className="mb-6 p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+                    <p className="text-[8px] font-black uppercase opacity-50 tracking-widest">Rewards Data</p>
+                    <div className="grid grid-cols-3 gap-2">
+                        {['points','miles','cashback'].map(rk => (
+                            <div key={rk} className="space-y-1">
+                                <label className="text-[7px] font-black uppercase opacity-60 block">{rk}</label>
+                                <input type="number" className="bg-black/20 p-2 rounded-lg text-[10px] font-bold w-full outline-none focus:ring-1 focus:ring-cyan-500 text-white" style={{ color: widgetFontColor }} value={c[rk] || 0} onChange={(e) => updateCard(c.id, rk, e.target.value)} />
+                            </div>
+                        ))}
+                    </div>
+                    <div className="space-y-1 pt-2">
+                        <label className="text-[7px] font-black uppercase opacity-60 block">{getLabel('expiryLabel')}</label>
+                        <input type="date" className="bg-black/20 p-2 rounded-lg text-[10px] font-bold w-full outline-none focus:ring-1 focus:ring-cyan-500 text-white" style={{ color: widgetFontColor }} value={c.expiryDate || ''} onChange={(e) => updateCard(c.id, 'expiryDate', e.target.value)} />
+                    </div>
+                  </div>
+
+                  <div className="mb-6 space-y-2">
+                    <label className="text-[7px] font-black uppercase opacity-60 block">Kelebihan / Tagging</label>
+                    <div className="flex flex-wrap gap-2">
+                      {PERK_TAGS.map(tag => (
+                        <button key={tag} onClick={() => {
+                          const currentTags = c.tags || [];
+                          const nextTags = currentTags.includes(tag) ? currentTags.filter(t => t !== tag) : [...currentTags, tag];
+                          updateCard(c.id, 'tags', nextTags);
+                        }} className={`px-3 py-1.5 rounded-full text-[9px] font-black transition-all border ${c.tags?.includes(tag) ? 'bg-cyan-500 border-cyan-400 text-black' : 'border-white/20 text-white/40 opacity-40'}`}>
+                          {tag}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <ProgressBar label="Usage" current={Number(c.currentOutstanding)||0} max={Number(c.limit)||1} accentColor={accentColor} fontColor={widgetFontColor} />
+              </div>
+          </div>
+        ))}
+    </div>
+  );
+
+  const renderInventory = () => {
+    if (!selectedBank) {
+      const counts = cards.reduce((acc, card) => { acc[card.bank || 'Others'] = (acc[card.bank || 'Others'] || 0) + 1; return acc; }, {});
+      const sortedBanks = [...userBanks].sort((a, b) => {
+        const aP = pinnedBanks.includes(a); const bP = pinnedBanks.includes(b);
+        if (aP && !bP) return -1; if (!aP && bP) return 1;
+        return bankSortOrder === 'AZ' ? a.localeCompare(b) : b.localeCompare(a);
+      });
+      return (
+        <div className="space-y-12 pb-20 animate-in fade-in duration-700 text-left">
+          <div className="flex flex-col md:flex-row justify-between md:items-center gap-6">
+            <h2 className="text-2xl font-black uppercase italic" style={{ color: fontColor }}>{getLabel('bankSelector')}</h2>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className={`flex p-1 rounded-xl border ${isDarkMode ? 'bg-black/40 border-white/10' : 'bg-slate-200 border-slate-300 shadow-inner'}`}>
+                <button onClick={() => setBankSortOrder('AZ')} className={`p-2 rounded-lg transition-all flex items-center justify-center ${bankSortOrder === 'AZ' ? (isDarkMode ? 'bg-white text-black' : 'bg-slate-900 text-white') : 'opacity-60 hover:opacity-100'}`} style={{ color: bankSortOrder === 'AZ' ? '' : fontColor }} title={getLabel('sortAZ')}><SortAsc size={16}/></button>
+                <button onClick={() => setBankSortOrder('ZA')} className={`p-2 rounded-lg transition-all flex items-center justify-center ${bankSortOrder === 'ZA' ? (isDarkMode ? 'bg-white text-black' : 'bg-slate-900 text-white') : 'opacity-60 hover:opacity-100'}`} style={{ color: bankSortOrder === 'ZA' ? '' : fontColor }} title={getLabel('sortZA')}><SortDesc size={16}/></button>
+              </div>
+              {showInventorySaveBtn && <AppButtonFixed isDarkMode={isDarkMode} onClick={handleSaveInventory} accentColor={accentColor} variant="primary" className="bg-emerald-500 text-black border-none"><Save size={18} /><span>{getLabel('saveChanges')}</span></AppButtonFixed>}
+              <AppButtonFixed isDarkMode={isDarkMode} onClick={() => setIsAddingBank(true)} accentColor={accentColor} variant="secondary"><Plus size={18} /><span>{getLabel('addBankBtn')}</span></AppButtonFixed>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {sortedBanks.map(bankName => (
+              <button key={bankName} onClick={() => setSelectedBank(bankName)} className={`p-8 rounded-[2.5rem] border transition-all duration-500 group hover:scale-105 active:scale-95 relative text-left ${isDarkMode ? 'bg-white/5 border-white/10 shadow-glow' : 'bg-white border-slate-200 shadow-xl'}`}>
+                <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-10">
+                  <div onClick={(e) => { e.stopPropagation(); setBankToDelete(bankName); }} className={`p-2 rounded-full text-red-500 transition-all hover:bg-red-500/10 ${pinnedBanks.includes(bankName) ? 'opacity-100' : 'opacity-40 group-hover:opacity-100'}`}><Trash2 size={16}/></div>
+                  <div onClick={(e) => togglePinBank(bankName, e)} className={`p-2 rounded-full transition-all ${pinnedBanks.includes(bankName) ? 'text-yellow-400 scale-110 opacity-100' : 'opacity-60 hover:opacity-100'}`} style={{ color: pinnedBanks.includes(bankName) ? '' : fontColor }}>{pinnedBanks.includes(bankName) ? <Pin size={16} fill="currentColor"/> : <PinOff size={16}/>}</div>
+                </div>
+                <div className="flex flex-col items-center text-center space-y-4">
+                  <div className={`w-16 h-16 rounded-3xl flex items-center justify-center transition-colors ${isDarkMode ? 'bg-white/10' : 'bg-slate-100 group-hover:bg-slate-200'}`} style={{ color: accentHex }}><Landmark size={32} /></div>
+                  <div><h3 className="text-lg font-black uppercase tracking-tight text-left" style={{ color: fontColor }}>{bankName}</h3><p className="text-[10px] font-bold opacity-40 uppercase tracking-widest text-left" style={{ color: fontColor }}>{counts[bankName] || 0} {getLabel('totalCards')}</p></div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="space-y-8 pb-20 animate-in slide-in-from-right-4 duration-700 text-left">
+        <div className="flex justify-between items-center text-white">
+            <div className="flex items-center space-x-4 text-left">
+              <button onClick={() => setSelectedBank(null)} className="p-2 rounded-full hover:bg-white/10 transition-all" style={{ color: fontColor }}><ChevronLeft size={24}/></button>
+              <div><h2 className="text-2xl font-black uppercase italic" style={{ color: fontColor }}>{selectedBank}</h2><p className="text-[10px] opacity-40 uppercase font-bold" style={{ color: fontColor }}>{getLabel('assetModule')}</p></div>
+            </div>
+            <div className="flex gap-2">
+              {showInventorySaveBtn && <AppButtonFixed isDarkMode={isDarkMode} onClick={handleSaveInventory} accentColor={accentColor} variant="primary" className="bg-emerald-500 text-black border-none"><Save size={18} /></AppButtonFixed>}
+              <AppButtonFixed isDarkMode={isDarkMode} onClick={() => { setCards(prev => [{ id: crypto.randomUUID(), bank: selectedBank, name: 'New Card', limit: 5000, currentOutstanding: 0, tags: [], points: 0, miles: 0, cashback: 0 }, ...prev]); setShowInventorySaveBtn(true); }} accentColor={accentColor} variant="secondary"><Plus size={18} /><span>{getLabel('addNewCard')}</span></AppButtonFixed>
+            </div>
+        </div>
+        {renderCardList(cards.filter(c => (c.bank || 'Others') === selectedBank))}
+      </div>
+    );
+  };
+
+  const renderCardPerks = () => {
+    const getExpiryStatus = (dateStr) => {
+        if (!dateStr) return { class: '', urgency: 0 };
+        const expiry = new Date(dateStr);
+        const today = new Date();
+        const diffDays = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
+        if (diffDays < 0) return { class: 'text-red-600 opacity-50', urgency: 3 };
+        if (diffDays <= 30) return { class: 'text-red-500 font-black animate-pulse bg-red-500/10 px-2 rounded', urgency: 2 };
+        if (diffDays <= 90) return { class: 'text-amber-500 font-bold', urgency: 1 };
+        return { class: 'text-emerald-500', urgency: 0 };
+    };
+
+    if (perksViewMode === 'table') {
+        return (
+            <div className="space-y-12 animate-in fade-in duration-500 text-left">
+                <div className="flex flex-col md:flex-row justify-between md:items-center gap-6">
+                    <div><h2 className="text-2xl font-black uppercase italic" style={{ color: fontColor }}>{getLabel('tableMode')}</h2><p className="text-[10px] opacity-40 font-bold uppercase" style={{ color: fontColor }}>Update rewards instantly</p></div>
+                    <div className="flex gap-3">
+                        <AppButtonFixed isDarkMode={isDarkMode} onClick={() => setIsQuickUpdatingRewards(true)} accentColor={accentColor} variant="primary" className="bg-orange-500 text-black border-none"><Zap size={18}/><span>Quick Update</span></AppButtonFixed>
+                        <AppButtonFixed isDarkMode={isDarkMode} onClick={() => setPerksViewMode('gallery')} accentColor={accentColor} variant="secondary"><LayoutGrid size={18}/><span>{getLabel('galleryMode')}</span></AppButtonFixed>
+                    </div>
+                </div>
+
+                <div className={`overflow-x-auto rounded-[2.5rem] border ${isDarkMode ? 'bg-black/40 border-white/10' : 'bg-white border-slate-200 shadow-xl'}`}>
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className={`border-b ${isDarkMode ? 'border-white/5' : 'border-slate-200'}`}>
+                                <th className="p-6 text-[10px] font-black uppercase opacity-40">Card & Bank</th>
+                                <th className="p-6 text-[10px] font-black uppercase opacity-40">{getLabel('pointsLabel')}</th>
+                                <th className="p-6 text-[10px] font-black uppercase opacity-40">{getLabel('cashbackShort')}</th>
+                                <th className="p-6 text-[10px] font-black uppercase opacity-40">{getLabel('milesLabel')}</th>
+                                <th className="p-6 text-[10px] font-black uppercase opacity-40">{getLabel('expiryLabel')}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {cards.map(c => {
+                                const expStatus = getExpiryStatus(c.expiryDate);
+                                return (
+                                    <tr key={c.id} className={`border-b last:border-0 hover:bg-white/5 transition-colors ${isDarkMode ? 'border-white/5' : 'border-slate-100'}`}>
+                                        <td className="p-6">
+                                            <div className="font-black text-xs uppercase" style={{ color: fontColor }}>{c.name}</div>
+                                            <div className="text-[9px] opacity-40 font-bold uppercase">{c.bank}</div>
+                                        </td>
+                                        <td className="p-6">
+                                            <input type="number" className="bg-transparent font-mono text-sm font-bold w-24 outline-none focus:bg-white/5 p-1 rounded" style={{ color: fontColor }} value={c.points || 0} onChange={(e) => updateCard(c.id, 'points', e.target.value)} />
+                                        </td>
+                                        <td className="p-6">
+                                            <div className="flex items-center space-x-1">
+                                                <span className="text-[10px] font-black opacity-30">{currencySymbol}</span>
+                                                <input type="number" className="bg-transparent font-mono text-sm font-bold w-24 outline-none text-emerald-500 focus:bg-white/5 p-1 rounded" value={c.cashback || 0} onChange={(e) => updateCard(c.id, 'cashback', e.target.value)} />
+                                            </div>
+                                        </td>
+                                        <td className="p-6">
+                                            <input type="number" className="bg-transparent font-mono text-sm font-bold w-24 outline-none focus:bg-white/5 p-1 rounded" style={{ color: accentHex }} value={c.miles || 0} onChange={(e) => updateCard(c.id, 'miles', e.target.value)} />
+                                        </td>
+                                        <td className="p-6 text-white">
+                                            <input type="date" className={`bg-transparent font-mono text-xs font-bold outline-none focus:bg-white/5 p-1 rounded ${expStatus.class}`} style={expStatus.urgency === 0 ? { color: fontColor } : {}} value={c.expiryDate || ''} onChange={(e) => updateCard(c.id, 'expiryDate', e.target.value)} />
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        );
+    }
+
+    if (activePerkTag) {
+      const filteredCards = cards.filter(c => c.tags?.includes(activePerkTag));
+      return (
+        <div className="space-y-12 animate-in fade-in duration-500 text-left">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-4">
+              <button onClick={() => setActivePerkTag(null)} className="p-2 rounded-full hover:bg-white/10" style={{ color: fontColor }}><ChevronLeft size={24}/></button>
+              <div><h2 className="text-2xl font-black uppercase italic" style={{ color: fontColor }}>{activePerkTag} {getLabel('compareTitle')}</h2><p className="text-[10px] opacity-40 uppercase font-bold" style={{ color: fontColor }}>{filteredCards.length} Cards Found</p></div>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 pb-6 border-b border-white/5">
+            {PERK_TAGS.map(tag => (
+              <button key={tag} onClick={() => setActivePerkTag(tag)} className={`px-6 py-2 rounded-full text-xs font-black uppercase transition-all border ${activePerkTag === tag ? 'bg-cyan-500 border-cyan-400 text-black' : 'border-white/10 text-white/40 hover:opacity-100'}`}>
+                {tag}
+              </button>
+            ))}
+          </div>
+          {filteredCards.length > 0 ? renderCardList(filteredCards) : <div className="h-64 flex flex-col items-center justify-center opacity-20 text-white"><Filter size={48}/><p className="mt-4 font-black uppercase tracking-widest text-center">Tiada kad ditemui</p></div>}
+        </div>
+      );
+    }
+    return (
+      <div className="space-y-12 pb-20 animate-in fade-in duration-700 text-left">
+        <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-black uppercase italic" style={{ color: fontColor }}>{getLabel('perkFilterTitle')}</h2>
+            <div className="flex gap-2">
+                <AppButtonFixed isDarkMode={isDarkMode} onClick={() => setIsQuickUpdatingRewards(true)} accentColor={accentColor} variant="primary" className="bg-orange-500 text-black border-none"><Zap size={18}/><span>Quick Update</span></AppButtonFixed>
+                <AppButtonFixed isDarkMode={isDarkMode} onClick={() => setPerksViewMode('table')} accentColor={accentColor} variant="primary"><Table size={18}/><span>{getLabel('tableMode')}</span></AppButtonFixed>
+            </div>
+        </div>
+        <div className="flex flex-wrap gap-3 p-6 rounded-[2.5rem] border border-white/5 bg-white/5 shadow-inner">
+          {PERK_TAGS.map(tag => (
+            <button key={tag} onClick={() => setActivePerkTag(tag)} className="flex items-center space-x-3 px-8 py-5 rounded-3xl bg-black/40 border border-white/5 hover:border-cyan-400/50 hover:bg-black/60 transition-all group active:scale-95">
+              <div className="w-10 h-10 rounded-2xl bg-cyan-500/10 flex items-center justify-center text-cyan-400 group-hover:bg-cyan-500 group-hover:text-black transition-colors"><Tag size={18}/></div>
+              <span className="text-sm font-black uppercase tracking-widest" style={{ color: fontColor }}>{tag}</span>
+            </button>
+          ))}
+        </div>
+        <div className="pt-10 border-t border-white/5">
+          <p className="text-[10px] font-black uppercase opacity-30 tracking-[0.2em] mb-8" style={{ color: fontColor }}>Atau semak melalui Bank</p>
+          {renderInventory()}
+        </div>
+      </div>
+    );
+  };
+
+  const renderDebtAnalysis = () => {
+    const totalLimit = cards.reduce((s, c) => s + (Number(c.limit) || 0), 0);
+    const totalDebt = cards.reduce((s, c) => s + (Number(c.currentOutstanding) || 0), 0);
+    const clearancePercent = totalLimit > 0 ? ((totalLimit - totalDebt) / totalLimit) * 100 : 0;
+    return (
+      <div className="space-y-12 pb-20 animate-in fade-in duration-500 text-left" style={{ color: fontColor }}>
+        <div className={`p-10 rounded-[4rem] border transition-all ${isDarkMode ? 'bg-slate-900 border-white/10 shadow-glow' : 'bg-white border-slate-200 shadow-xl'}`}>
+            <div className="flex flex-col md:flex-row items-center gap-10 text-left text-white">
+                <RadialGauge percentage={clearancePercent} accentColor={accentColor} fontColor={widgetFontColor} glowEnabled={glowEnabled} glowColor={glowColor} />
+                <div className="flex-1 space-y-4 text-left">
+                    <h3 className="text-2xl font-black uppercase tracking-tighter text-left" style={{ color: accentHex }}>{getLabel('motivationTitle')}</h3>
+                    <p className="text-xs opacity-70 font-black max-w-md text-left" style={{ color: widgetFontColor }}>{getLabel('motivationDesc')}</p>
+                    <div className="flex items-center space-x-2 text-emerald-500 font-black uppercase text-sm text-left"><CheckCircle2 size={20} /><span>{formatCurrencyValue(totalLimit - totalDebt, currencySymbol)} Available Limit</span></div>
+                </div>
+            </div>
+        </div>
+        <div className={`p-8 rounded-[3rem] border transition-all ${isDarkMode ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200 shadow-xl'}`}>
+            <h3 className="text-lg font-black uppercase mb-8 flex items-center space-x-3 text-left"><GaugeIcon style={{ color: accentHex }} /> <span style={{ color: widgetFontColor }}>{getLabel('comparisonTitle')}</span></h3>
+            <UtilizationHeatBars data={cards.map(c => ({ name: c.name, limit: Number(c.limit) || 0, debt: Number(c.currentOutstanding) || 0 }))} symbol={currencySymbol} fontColor={widgetFontColor} isDarkMode={isDarkMode} />
+        </div>
+      </div>
+    );
+  };
+
+  const renderHistory = () => (
+    <div className="space-y-6 text-white animate-in fade-in duration-500 text-left text-left text-left">
+        <h2 className="text-2xl font-black uppercase italic text-white text-left text-left text-left" style={{ color: fontColor }}>{getLabel('historyTitle')}</h2>
+        <div className={`h-[70vh] overflow-y-auto p-8 rounded-[3rem] border transition-all ${isDarkMode ? 'bg-white/5 border-white/10 shadow-inner' : 'bg-white shadow-xl'}`}>
+            {history.length > 0 ? history.map((h, i) => (<div key={i} className="flex justify-between items-start py-5 border-b last:border-0 text-sm border-black/5 hover:translate-x-1 transition-transform text-white text-left text-left text-left"><div className="flex flex-col text-white text-left text-left"><span className="font-bold tracking-tight text-white text-left text-left text-left text-left text-left" style={{ color: fontColor }}>{String(h.action)}</span><span className="font-mono text-[9px] opacity-60 mt-1 uppercase tracking-tighter text-white text-left text-left text-left text-left text-left" style={{ color: fontColor }}>{formatFullTimestamp(h.timestamp, language)}</span></div><div className="w-2 h-2 rounded-full mt-2" style={{ backgroundColor: accentHex }}></div></div>)) : <div className="opacity-40 uppercase text-xs p-8 text-center text-white text-left text-left text-left" style={{ color: fontColor }}>Tiada log audit direkodkan.</div>}
+        </div>
+    </div>
+  );
+
+  const renderSettings = () => (
+    <div className="space-y-8 pb-20 animate-in slide-in-from-bottom-4 duration-500 text-left text-white">
+      {settingsOrder.map(s => {
+        const blockStyle = `p-8 rounded-[3rem] border transition-all text-left ${isDarkMode ? 'bg-white/5 border-white/10' : 'bg-white shadow-xl'}`;
+        const renderSave = (fn, id) => (
+          <div className="flex flex-col items-end space-y-2 text-left">
+            <AppButtonFixed isDarkMode={isDarkMode} onClick={fn} accentColor={accentColor} className="px-6 h-10 uppercase tracking-widest text-[10px]">Save</AppButtonFixed>
+            {saveTimestamps[id] && <div className="flex items-center space-x-1 opacity-60 text-[8px] font-bold uppercase tracking-tighter text-left" style={{ color: fontColor }}><Clock size={10} /><span>{getLabel('lastUpdated')}: {saveTimestamps[id]}</span></div>}
+          </div>
+        );
+        
+        switch(s.id) {
+          case 'header':
+            return (
+              <div key="header" className={blockStyle}>
+                <div className="flex justify-between items-start mb-6">
+                  <div className="text-left text-white"><div className="text-lg font-bold" style={{ color: fontColor }}>{getLabel('headerConfigTitle')}</div><p className="text-xs opacity-40" style={{ color: fontColor }}>{getLabel('headerConfigDesc')}</p></div>
+                  {renderSave(() => saveLabelsConfig('header'), 'header')}
+                </div>
+                <input className="w-full bg-black/40 border border-white/5 p-4 rounded-2xl font-bold text-white outline-none text-left" value={customLabels.mainTitle || t.mainTitle} onChange={(e) => setCustomLabels({...customLabels, mainTitle: e.target.value})} />
+              </div>
+            );
+          case 'navLabels':
+            return (
+              <div key="navLabels" className={blockStyle}>
+                <div className="flex justify-between items-start mb-6">
+                  <div className="text-left text-white"><div className="text-lg font-bold" style={{ color: fontColor }}>{getLabel('navLabelConfigTitle')}</div><p className="text-xs opacity-40" style={{ color: fontColor }}>{getLabel('navLabelConfigDesc')}</p></div>
+                  {renderSave(() => saveLabelsConfig('navLabels'), 'navLabels')}
+                </div>
+                <div className="flex flex-wrap gap-2 mb-6 bg-black/20 p-2 rounded-2xl">
+                  {DEFAULT_TABS.map(tab => (
+                    <button key={tab.id} onClick={() => setActiveNavEditTab(tab.id)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${activeNavEditTab === tab.id ? 'bg-white text-black' : 'opacity-40 hover:opacity-100'}`}>{tab.id.replace('-', ' ')}</button>
+                  ))}
+                </div>
+                {DEFAULT_TABS.filter(t => t.id === activeNavEditTab).map(tab => (
+                  <div key={tab.id} className="bg-white/5 p-6 rounded-2xl border border-white/5 space-y-4 text-left">
+                    <div className="flex items-center space-x-3 opacity-60 text-left" style={{ color: fontColor }}><tab.icon size={16} /><span className="text-[10px] font-black uppercase">Editing Menu: {tab.id}</span></div>
+                    <input className="w-full bg-black/40 border border-white/10 p-4 rounded-xl font-bold text-white text-left outline-none focus:border-cyan-400/50" value={customLabels[tab.key] || t[tab.key]} onChange={(e) => setCustomLabels({...customLabels, [tab.key]: e.target.value})} />
+                  </div>
+                ))}
+              </div>
+            );
+          case 'navOrder':
+            return (
+              <div key="navOrder" className={blockStyle}>
+                <div className="flex justify-between items-start mb-6 text-left">
+                  <div className="text-left text-white"><div className="text-lg font-bold" style={{ color: fontColor }}>{getLabel('navOrderConfigTitle')}</div><p className="text-xs opacity-40" style={{ color: fontColor }}>{getLabel('navOrderConfigDesc')}</p></div>
+                  {renderSave(saveNavOrderConfig, 'navOrder')}
+                </div>
+                <div className="space-y-3">
+                  {orderedTabs.map((tab, idx) => (
+                    <div key={tab.id} className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/10">
+                      <div className="flex items-center space-x-4 text-left text-white"><tab.icon size={18} className="opacity-50" /><span className="font-bold text-left" style={{ color: fontColor }}>{getLabel(tab.key)}</span></div>
+                      <div className="flex space-x-2">
+                        <button onClick={() => moveTab(idx, 'up')} disabled={idx === 0} className="p-2 hover:bg-white/10 rounded-full disabled:opacity-20"><ArrowUp size={20} style={{ color: fontColor }} /></button>
+                        <button onClick={() => moveTab(idx, 'down')} disabled={idx === orderedTabs.length - 1} className="p-2 hover:bg-white/10 rounded-full disabled:opacity-20"><ArrowDown size={20} style={{ color: fontColor }} /></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          case 'settingsLayout':
+            return (
+              <div key="settingsLayout" className={blockStyle}>
+                <div className="flex justify-between items-start mb-6">
+                  <div className="text-left text-white text-white text-white"><div className="text-lg font-bold" style={{ color: fontColor }}>{getLabel('settingsLayoutConfigTitle')}</div><p className="text-xs opacity-40" style={{ color: fontColor }}>{getLabel('settingsLayoutConfigDesc')}</p></div>
+                  {renderSave(saveSettingsOrderConfig, 'settingsLayout')}
+                </div>
+                <div className="space-y-3">
+                  {settingsOrder.map((sBlock, idx) => (
+                    <div key={sBlock.id} className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/10 text-left">
+                      <div className="flex items-center space-x-4 text-white text-left"><ListOrdered size={18} className="opacity-50" /><span className="font-bold text-white text-left" style={{ color: fontColor }}>{getLabel(sBlock.key)}</span></div>
+                      <div className="flex space-x-2 text-white">
+                        <button onClick={() => moveSettingBlock(idx, 'up')} disabled={idx === 0} className="p-2 hover:bg-white/10 rounded-full disabled:opacity-20 text-white"><ArrowUp size={20} style={{ color: fontColor }} /></button>
+                        <button onClick={() => moveSettingBlock(idx, 'down')} disabled={idx === settingsOrder.length - 1} className="p-2 hover:bg-white/10 rounded-full disabled:opacity-20 text-white"><ArrowDown size={20} style={{ color: fontColor }} /></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          case 'language':
+            return (
+              <div key="language" className={blockStyle}>
+                <div className="flex justify-between items-start mb-6 text-white text-white">
+                  <div className="text-left text-white"><div className="text-lg font-bold" style={{ color: fontColor }}>{getLabel('languageSettingTitle')}</div><p className="text-xs opacity-40" style={{ color: fontColor }}>{getLabel('languageSettingDesc')}</p></div>
+                  {renderSave(saveLanguageConfig, 'language')}
+                </div>
+                <div className="flex bg-black/40 p-1.5 rounded-2xl border border-white/5 w-fit">
+                  <button onClick={() => setLanguage('ENG')} className={`px-8 py-3 rounded-xl text-xs font-black uppercase transition-all ${language === 'ENG' ? `text-black` : 'opacity-40'}`} style={language === 'ENG' ? { backgroundColor: accentHex } : {}}>ENG</button>
+                  <button onClick={() => setLanguage('BM')} className={`px-8 py-3 rounded-xl text-xs font-black uppercase transition-all ${language === 'BM' ? `text-black` : 'opacity-40'}`} style={language === 'BM' ? { backgroundColor: accentHex } : {}}>BM</button>
+                </div>
+              </div>
+            );
+          case 'visual':
+            return (
+              <div key="visual" className={blockStyle}>
+                <div className="flex justify-between items-start mb-6">
+                  <div className="text-left text-white text-white"><div className="text-lg font-bold" style={{ color: fontColor }}>{getLabel('visualEffectsTitle')}</div><p className="text-xs opacity-40" style={{ color: fontColor }}>{getLabel('visualEffectsDesc')}</p></div>
+                  {renderSave(() => saveVisualConfig('visual'), 'visual')}
+                </div>
+                <div className="space-y-4 text-white">
+                  <div className="flex items-center space-x-4 text-white">
+                    <button onClick={() => setGlowEnabled(!glowEnabled)} className={`relative w-14 h-7 rounded-full transition-all duration-500 ${glowEnabled ? 'bg-emerald-500' : 'bg-white/10'}`}><div className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all duration-500 ${glowEnabled ? 'left-8' : 'left-1'}`}></div></button>
+                    <span className="text-xs font-bold uppercase opacity-60 text-white" style={{ color: fontColor }}>{glowEnabled ? 'Glow Enabled' : 'Glow Disabled'}</span>
+                  </div>
+                  {glowEnabled && (
+                    <div className="flex flex-wrap gap-4 text-white">
+                      {GLOW_COLORS.map(c => (<button key={c.id} onClick={() => setGlowColor(c.hex)} className={`w-10 h-10 rounded-full border-4 transition-all ${glowColor === c.hex ? 'border-white scale-110 shadow-lg' : 'border-transparent opacity-60'}`} style={{ backgroundColor: c.hex, boxShadow: glowColor === c.hex ? `0 0 15px ${c.hex}88` : 'none' }}></button>))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          case 'github':
+            return (
+              <div key="github" className={blockStyle}>
+                <div className="flex justify-between items-start mb-6">
+                  <div className="text-left text-white"><div className="text-lg font-bold" style={{ color: fontColor }}>{getLabel('githubConfigTitle')}</div><p className="text-xs opacity-40" style={{ color: fontColor }}>{getLabel('githubConfigDesc')}</p></div>
+                  {renderSave(saveGithubConfig, 'github')}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input className="bg-black/20 border-b border-white/10 p-3 text-xs font-bold outline-none" style={{ color: fontColor }} value={githubConfig.username} onChange={(e) => setGithubConfig({...githubConfig, username: e.target.value})} placeholder="GitHub Username" />
+                    <input className="bg-black/20 border-b border-white/10 p-3 text-xs font-bold outline-none" style={{ color: fontColor }} value={githubConfig.repo} onChange={(e) => setGithubConfig({...githubConfig, repo: e.target.value})} placeholder="Repo Name" />
+                    <input type="password" className="bg-black/20 border-b border-white/10 p-3 text-xs font-bold outline-none" style={{ color: fontColor }} value={githubConfig.token} onChange={(e) => setGithubConfig({...githubConfig, token: e.target.value})} placeholder="Personal Access Token" />
+                    <input className="bg-black/20 border-b border-white/10 p-3 text-xs font-bold outline-none" style={{ color: fontColor }} value={githubConfig.path} onChange={(e) => setGithubConfig({...githubConfig, path: e.target.value})} placeholder="File Path (e.g., data.json)" />
+                </div>
+                <div className="flex gap-3 mt-6">
+                    <AppButtonFixed isDarkMode={isDarkMode} accentColor={accentColor} variant="secondary" className="flex-1"><CloudUpload size={16}/><span>Push to GitHub</span></AppButtonFixed>
+                    <AppButtonFixed isDarkMode={isDarkMode} accentColor={accentColor} variant="secondary" className="flex-1"><CloudDownload size={16}/><span>Pull from GitHub</span></AppButtonFixed>
+                </div>
+              </div>
+            );
+          case 'backup':
+            return (
+              <div key="backup" className={blockStyle}>
+                <div className="flex justify-between items-start mb-6 text-left">
+                  <div className="text-left text-white text-white text-white text-white text-white text-white text-white">
+                    <div className="text-lg font-bold" style={{ color: fontColor }}>{getLabel('dataManagementTitle')}</div>
+                    <p className="text-xs opacity-40" style={{ color: fontColor }}>{getLabel('dataManagementDesc')}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-white text-white text-white">
+                  <AppButtonFixed isDarkMode={isDarkMode} onClick={handleExportData} accentColor={accentColor} variant="secondary" className="w-full">Export JSON</AppButtonFixed>
+                  <AppButtonFixed isDarkMode={isDarkMode} onClick={handleResetSystem} accentColor="red-500" variant="secondary" className="w-full">Reset System</AppButtonFixed>
+                </div>
+              </div>
+            );
+          case 'fontColor':
+            return (
+              <div key="fontColor" className={blockStyle}>
+                <div className="flex justify-between items-start mb-6">
+                  <div className="text-left text-white text-white"><div className="text-lg font-bold" style={{ color: fontColor }}>{getLabel('colorSettingTitle')}</div><p className="text-xs opacity-40" style={{ color: fontColor }}>{getLabel('colorSettingDesc')}</p></div>
+                  {renderSave(() => saveVisualConfig('fontColor'), 'fontColor')}
+                </div>
+                <div className="flex flex-wrap gap-4">
+                  {FONT_COLORS.map(c => <button key={c.hex} onClick={() => setFontColor(c.hex)} className={`w-10 h-10 rounded-full border-4 transition-all ${fontColor === c.hex ? 'border-white scale-110 shadow-lg' : 'border-transparent'}`} style={{ backgroundColor: c.hex }}></button>)}
+                </div>
+              </div>
+            );
+          case 'widgetFontColor':
+            return (
+              <div key="widgetFontColor" className={blockStyle}>
+                <div className="flex justify-between items-start mb-6">
+                  <div className="text-left text-white text-white"><div className="text-lg font-bold" style={{ color: fontColor }}>{getLabel('widgetFontColorTitle')}</div><p className="text-xs opacity-40" style={{ color: fontColor }}>{getLabel('widgetFontColorDesc')}</p></div>
+                  {renderSave(() => saveVisualConfig('widgetFontColor'), 'widgetFontColor')}
+                </div>
+                <div className="flex flex-wrap gap-4">
+                  {FONT_COLORS.map(c => <button key={c.hex} onClick={() => setWidgetFontColor(c.hex)} className={`w-10 h-10 rounded-full border-4 transition-all ${widgetFontColor === c.hex ? 'border-white scale-110 shadow-lg' : 'border-transparent'}`} style={{ backgroundColor: c.hex }}></button>)}
+                </div>
+              </div>
+            );
+          case 'background':
+            return (
+              <div key="background" className={blockStyle}>
+                <div className="flex justify-between items-start mb-6">
+                  <div className="text-left text-white text-white"><div className="text-lg font-bold" style={{ color: fontColor }}>{getLabel('bgSettingTitle')}</div><p className="text-xs opacity-40" style={{ color: fontColor }}>{getLabel('bgSettingDesc')}</p></div>
+                  {renderSave(saveBgConfig, 'background')}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-white">
+                  <div className="space-y-4">
+                    <label className="text-[10px] font-black uppercase opacity-60 flex items-center space-x-2 text-white" style={{ color: fontColor }}><Sun size={12}/><span>Day Mode</span></label>
+                    <div className="grid grid-cols-2 gap-2 text-white">
+                      {DAY_BGS.map(bg => <button key={bg.class} onClick={() => { setDayBg(bg.class); setFontColor(bg.defaultFont); setWidgetFontColor(bg.defaultFont); setIsDarkMode(false); }} className={`p-3 rounded-xl border text-[10px] font-bold text-left ${dayBg === bg.class && !isDarkMode ? 'border-white' : 'border-slate-200 opacity-50'}`} style={dayBg === bg.class && !isDarkMode ? { borderColor: accentHex, color: fontColor } : { color: fontColor }}><div className={`w-full h-4 rounded-sm mb-1 ${bg.class} border border-black/10 text-left`}></div>{bg.class}</button>)}
+                    </div>
+                  </div>
+                  <div className="space-y-4 text-left">
+                    <label className="text-[10px] font-black uppercase opacity-60 flex items-center space-x-2 text-white" style={{ color: fontColor }}><Moon size={12}/><span>Night Mode</span></label>
+                    <div className="grid grid-cols-2 gap-2 text-white text-white">
+                      {NIGHT_BGS.map(bg => <button key={bg.class} onClick={() => { setNightBg(bg.class); setFontColor(bg.defaultFont); setWidgetFontColor(bg.defaultFont); setIsDarkMode(true); }} className={`p-3 rounded-xl border text-[10px] font-bold text-left ${nightBg === bg.class && isDarkMode ? 'border-white' : 'border-white/5 opacity-50'}`} style={nightBg === bg.class && isDarkMode ? { borderColor: accentHex, color: fontColor } : { color: fontColor }}><div className={`w-full h-4 rounded-sm mb-1 ${bg.class} border border-black/10 text-left`}></div>{bg.class}</button>)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          case 'fieldMgmt':
+            return (
+              <div key="fieldMgmt" className={blockStyle}>
+                <div className="flex justify-between items-start mb-6">
+                  <div className="text-left text-white text-white text-white text-white text-white text-white text-lg font-bold text-white" style={{ color: fontColor }}>{getLabel('fieldConfigTitle')}</div>
+                  {renderSave(saveFieldConfig, 'fieldMgmt')}
+                </div>
+                <div className="flex flex-wrap gap-2 mb-6 bg-black/20 p-2 rounded-2xl text-white">
+                  {FIELD_GROUPS.map(group => (<button key={group.id} onClick={() => setActiveFieldGroupTab(group.id)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${activeFieldGroupTab === group.id ? 'bg-white text-black' : 'opacity-40 hover:opacity-100'}`}>{group.name}</button>))}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {FIELD_GROUPS.find(g => g.id === activeFieldGroupTab)?.keys.map(key => (
+                    <div key={key} className={`p-4 rounded-2xl border space-y-3 text-left ${isDarkMode ? 'bg-white/5 border-white/10' : 'bg-black/10 border-black/10'}`}>
+                      <div className="flex justify-between items-center text-left text-white">
+                        <span className="text-[10px] font-black uppercase tracking-tighter opacity-60 text-white" style={{ color: fontColor }}>{key}</span>
+                        <button onClick={() => setFieldConfig(prev => ({ ...prev, [key]: { ...prev[key], visible: !prev[key].visible } }))} className={`px-3 py-1 rounded-full text-[9px] font-black uppercase transition-all ${fieldConfig[key].visible ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>{fieldConfig[key].visible ? getLabel('visible') : getLabel('hidden')}</button>
+                      </div>
+                      <input type="text" className="w-full bg-black/10 border-b border-white/10 p-2 text-xs font-bold outline-none focus:border-white/30 text-white" style={{ color: fontColor }} value={fieldConfig[key].label} onChange={(e) => setFieldConfig(prev => ({ ...prev, [key]: { ...prev[key], label: e.target.value } }))} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          case 'dateMode':
+            return (
+              <div key="dateMode" className={blockStyle}>
+                <div className="flex justify-between items-start mb-6">
+                  <div className="text-left text-white text-white text-white text-white text-white text-white text-lg font-bold text-white" style={{ color: fontColor }}>{getLabel('dateSelectorTitle')}</div>
+                  {renderSave(saveDateModeConfig, 'dateMode')}
+                </div>
+                <div className="flex bg-black/40 p-1.5 rounded-2xl border border-white/5 w-fit">
+                  <button onClick={() => setDateInputMode('dropdown')} className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${dateInputMode === 'dropdown' ? `text-black` : 'opacity-40'}`} style={dateInputMode === 'dropdown' ? { backgroundColor: accentHex } : {}}>Dropdown</button>
+                  <button onClick={() => setDateInputMode('manual')} className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${dateInputMode === 'manual' ? `text-black` : 'opacity-40'}`} style={dateInputMode === 'manual' ? { backgroundColor: accentHex } : {}}>Manual</button>
+                </div>
+              </div>
+            );
+          default:
+            return null;
+        }
+      })}
+    </div>
+  );
+
+  return (
+    <div style={{ fontFamily }} className={`min-h-screen transition-all duration-500 selection:bg-white selection:text-black ${isDarkMode ? nightBg : dayBg}`}>
+      <nav className={`fixed inset-y-0 left-0 z-50 border-r transition-all duration-500 lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${isSidebarCollapsed ? 'w-20' : 'w-72'} ${isDarkMode ? 'bg-black/95 border-white/10 shadow-2xl' : 'bg-white border-slate-200 shadow-2xl'}`}>
+        <div className="flex flex-col h-full text-white text-left">
+          <div className="p-6 flex items-center space-x-3 mb-8 cursor-pointer" onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}>
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-lg transition-transform ${isDarkMode ? 'text-black' : 'bg-slate-900 text-white'}`} style={isDarkMode ? { backgroundColor: accentHex } : {}}><Zap size={24} fill="currentColor" /></div>
+            {!isSidebarCollapsed && <h1 className="text-xl font-black italic tracking-tighter" style={{ color: fontColor }}>{String(getLabel('mainTitle'))}</h1>}
+          </div>
+          
+          <div className="flex-1 overflow-y-auto px-4 custom-scrollbar text-white">
+            <div className="space-y-2 pb-10">
+              {orderedTabs.map(tab => (
+                  <button key={tab.id} onClick={() => { setCurrentTab(tab.id); setIsSidebarOpen(false); }} className={`flex items-center rounded-xl transition-all font-black text-sm text-white text-left ${isSidebarCollapsed ? 'w-12 h-12 justify-center' : 'w-full px-4 py-3 space-x-4'} ${currentTab === tab.id ? (isDarkMode ? 'text-black shadow-lg' : 'bg-slate-900 text-white shadow-lg') : 'hover:bg-black/5 opacity-60 hover:opacity-100'}`} style={currentTab === tab.id && isDarkMode ? { backgroundColor: accentHex } : { color: currentTab === tab.id ? '' : fontColor }}>
+                    <tab.icon size={18} className="flex-shrink-0" />
+                    {!isSidebarCollapsed && <span>{getLabel(tab.key)}</span>}
+                  </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      <div className={`transition-all duration-500 min-h-screen flex flex-col ${isSidebarCollapsed ? 'lg:pl-20' : 'lg:pl-72'}`}>
+        <header className={`p-4 lg:p-6 flex justify-between items-center backdrop-blur-md sticky top-0 z-40 border-b transition-all ${isDarkMode ? 'bg-black/20 border-white/5' : 'bg-white border-slate-200'}`}>
+          <button onClick={() => setIsSidebarOpen(true)} className="lg:hidden p-2 opacity-50 text-white" style={{ color: fontColor }}><Menu/></button>
+          <div className="hidden lg:block text-left" style={{ color: fontColor }}><p className="text-[10px] font-black uppercase tracking-[0.4em] opacity-30 text-white">{getLabel('securityLevel')}</p><h2 className="text-xl font-bold font-orbitron text-white">{getLabel('mainTitle')}</h2></div>
+          <div className="flex items-center space-x-4">
+            <button onClick={() => setLanguage(language === 'ENG' ? 'BM' : 'ENG')} className="flex items-center space-x-1 px-3 py-1.5 rounded-full border border-black/10 text-[10px] font-black tracking-widest hover:bg-black/5 transition-all text-white text-left" style={{ color: fontColor }}><span>{language}</span></button>
+            <button onClick={() => { 
+                const n = !isDarkMode; setIsDarkMode(n); const d = n ? '#ffffff' : '#000000';
+                setFontColor(d); setWidgetFontColor(d);
+            }} className="flex items-center space-x-2 px-3 py-1.5 rounded-full border border-black/10 hover:bg-black/5 transition-all text-white text-left" style={{ color: fontColor }}>{isDarkMode ? <Sun size={16} className="text-yellow-400" /> : <Moon size={16} />}</button>
+          </div>
+        </header>
+
+        <main className="p-4 lg:p-8 flex-1">
+          {message && <div className={`mb-6 p-4 rounded-xl border ${message.type === 'error' ? 'bg-red-900/20 border-red-500 text-red-400' : 'bg-black/5 border-black/10'}`} style={message.type !== 'error' ? { borderColor: accentHex, color: fontColor } : {}}>{message.text}</div>}
+          {currentTab === 'dashboard' && renderDashboard()}
+          {currentTab === 'inventory' && renderInventory()}
+          {currentTab === 'card-perks' && renderCardPerks()}
+          {currentTab === 'debt-analysis' && renderDebtAnalysis()}
+          {currentTab === 'history' && renderHistory()}
+          {currentTab === 'settings' && renderSettings()}
+        </main>
+      </div>
+
+      {isAddingBank && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md text-left text-white">
+            <div className={`w-full max-w-sm p-8 rounded-[3rem] border shadow-2xl ${isDarkMode ? 'bg-slate-900 border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'}`}>
+                <div className="flex justify-between items-center mb-6 text-white text-left"><h3 className="text-xl font-black uppercase italic" style={{ color: isDarkMode ? '#ffffff' : '#000000' }}>{getLabel('confirmAddBank')}</h3><button onClick={() => setIsAddingBank(false)} className="p-2 opacity-50 text-white"><X/></button></div>
+                <div className="space-y-6 text-white text-left">
+                    <div className="text-left text-white text-white"><label className="text-[10px] font-bold uppercase opacity-60 mb-2 block">{getLabel('bankNameLabel')}</label><input type="text" className="w-full bg-transparent border-b p-3 font-bold outline-none" style={{ color: isDarkMode ? '#ffffff' : '#000000' }} value={newBankName} onChange={(e) => setNewBankName(e.target.value)} placeholder="Maybank, RHB..." /></div>
+                    <AppButtonFixed isDarkMode={isDarkMode} onClick={handleAddBank} accentColor={accentColor} className="w-full py-5 rounded-[2rem] uppercase font-black text-white text-white">Add Bank</AppButtonFixed>
+                </div>
+            </div>
+          </div>
+      )}
+
+      {/* Quick Rewards Update Modal */}
+      {isQuickUpdatingRewards && (
+          <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl text-left">
+            <div className={`w-full max-w-sm p-8 rounded-[3rem] border shadow-2xl ${isDarkMode ? 'bg-slate-900 border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'}`}>
+                <div className="flex justify-between items-center mb-6 text-left"><h3 className="text-xl font-black uppercase italic" style={{ color: isDarkMode ? '#ffffff' : '#000000' }}>{getLabel('quickUpdateTitle')}</h3><button onClick={() => setIsQuickUpdatingRewards(false)} className="p-2 opacity-50 text-white"><X/></button></div>
+                <div className="space-y-6 text-white text-left">
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-bold uppercase opacity-60 block">{getLabel('selectBank')}</label>
+                        <select className="w-full bg-black/40 border-b p-3 font-bold outline-none rounded-t-xl text-white" style={{ color: isDarkMode ? '#ffffff' : '#000000' }} value={quickUpdateData.bankName} onChange={(e) => setQuickUpdateData({...quickUpdateData, bankName: e.target.value, cardId: ''})}>
+                            <option value="">-- {getLabel('selectBank')} --</option>
+                            {userBanks.map(b => <option key={b} value={b}>{b}</option>)}
+                        </select>
+                    </div>
+                    {quickUpdateData.bankName && (
+                        <div className="space-y-1 animate-in slide-in-from-top-2">
+                            <label className="text-[10px] font-bold uppercase opacity-60 block">{getLabel('selectCard')}</label>
+                            <select className="w-full bg-black/40 border-b p-3 font-bold outline-none text-white" style={{ color: isDarkMode ? '#ffffff' : '#000000' }} value={quickUpdateData.cardId} onChange={(e) => setQuickUpdateData({...quickUpdateData, cardId: e.target.value})}>
+                                <option value="">-- {getLabel('selectCard')} --</option>
+                                {cards.filter(c => c.bank === quickUpdateData.bankName).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                        </div>
+                    )}
+                    {quickUpdateData.cardId && (
+                        <div className="space-y-4 animate-in slide-in-from-top-2">
+                            <div className="grid grid-cols-3 gap-2">
+                                {['points', 'miles', 'cashback'].map(type => (
+                                    <button key={type} onClick={() => setQuickUpdateData({...quickUpdateData, type})} className={`py-2 rounded-xl text-[10px] font-black uppercase transition-all border ${quickUpdateData.type === type ? 'bg-cyan-500 border-cyan-400 text-black' : 'border-white/10 opacity-40'}`}>{type}</button>
+                                ))}
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold uppercase opacity-60 block">New {quickUpdateData.type} Value</label>
+                                <input type="number" className="w-full bg-transparent border-b p-3 font-mono font-bold text-lg outline-none text-white" style={{ color: isDarkMode ? '#ffffff' : '#000000' }} value={quickUpdateData.value} onChange={(e) => setQuickUpdateData({...quickUpdateData, value: e.target.value})} placeholder="0.00" />
+                            </div>
+                            <AppButtonFixed isDarkMode={isDarkMode} onClick={() => {
+                                if(!quickUpdateData.cardId || quickUpdateData.value === '') return;
+                                updateCard(quickUpdateData.cardId, quickUpdateData.type, quickUpdateData.value);
+                                setIsQuickUpdatingRewards(false);
+                                setQuickUpdateData({ bankName: '', cardId: '', type: 'points', value: '' });
+                                showMsg('Ganjaran dikemaskini!');
+                            }} accentColor={accentColor} className="w-full py-5 rounded-[2rem] uppercase font-black text-white">{getLabel('updateBtn')}</AppButtonFixed>
+                        </div>
+                    )}
+                </div>
+            </div>
+          </div>
+      )}
+
+      {bankToDelete && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl text-left">
+            <div className={`w-full max-w-md p-8 rounded-[3rem] border shadow-2xl ${isDarkMode ? 'bg-slate-900 border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'}`}>
+                <div className="flex justify-center mb-6"><div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center text-red-500"><AlertTriangle size={32}/></div></div>
+                <h3 className="text-xl font-black text-center uppercase mb-4" style={{ color: isDarkMode ? '#ffffff' : '#000000' }}>{bankToDelete}</h3>
+                <p className="text-xs opacity-70 text-center mb-8 font-bold leading-relaxed">{getLabel('deleteBankConfirm')}</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <AppButtonFixed isDarkMode={isDarkMode} onClick={() => setBankToDelete(null)} accentColor={accentColor} variant="secondary" className="w-full py-4">{getLabel('cancel')}</AppButtonFixed>
+                  <AppButtonFixed isDarkMode={isDarkMode} onClick={() => handleDeleteBank(bankToDelete)} accentColor="red-500" className="w-full py-4 bg-red-600 text-white border-none">{getLabel('confirm')}</AppButtonFixed>
+                </div>
+            </div>
+          </div>
+      )}
+
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;700;900&family=Roboto+Mono:wght@400;700&family=Playfair+Display:wght@700;900&display=swap');
+        .font-orbitron { font-family: 'Orbitron', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        .shadow-glow { box-shadow: 0 0 25px currentColor; }
+      `}</style>
+    </div>
+  );
+};
+
+export default App;
